@@ -11,6 +11,7 @@
     "expo-image-manipulator": "~57.0.5",
     "expo-image-picker": "~57.0.5",
     "expo-media-library": "~57.0.3",
+    "expo-splash-screen": "~57.0.4",
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "jpeg-js": "^0.4.4",

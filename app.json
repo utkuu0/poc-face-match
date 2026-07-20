@@ -52,7 +52,8 @@
           "photosPermission": "Galerideki fotoğrafları tarayıp yüz eşleştirebilmek için erişim gerekiyor."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-splash-screen"
     ],
     "extra": {
       "eas": {
