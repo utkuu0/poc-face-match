@@ -17,6 +17,12 @@ export const DEFAULT_MATCH_THRESHOLD = 0.7;
 // daha iyi embedding üretir.
 const FACE_CROP_MARGIN_RATIO = 0.25;
 
+// Modern telefon fotoğrafları 12MP+ olabiliyor; ML Kit'i orijinal boyutta çalıştırmak
+// (özellikle galeri taraması gibi art arda çok fotoğraf işlerken) OutOfMemoryError'a
+// yol açıyor. Tespiti bu boyuta küçültülmüş bir kopya üzerinde yapıyoruz — yüz tespiti
+// için fazlasıyla yeterli, MobileFaceNet zaten 112x112'ye küçültülmüş bir kırpım bekliyor.
+const DETECTION_MAX_DIMENSION = 1024;
+
 export class NoFaceDetectedError extends Error {
   constructor(label?: string) {
     super(label ? `${label} fotoğrafında yüz bulunamadı.` : 'Fotoğrafta yüz bulunamadı.');
@@ -44,13 +50,45 @@ function getImageSize(uri: string): Promise<{ width: number; height: number }> {
   });
 }
 
-async function detectFaces(uri: string): Promise<Face[]> {
-  return FaceDetection.detect(uri, {
+interface DetectionSource {
+  /** Tespitin ve sonraki kırpmanın yapıldığı (gerekirse küçültülmüş) fotoğrafın uri'si. */
+  uri: string;
+  width: number;
+  height: number;
+  faces: Face[];
+}
+
+/**
+ * Fotoğrafı (gerekirse) DETECTION_MAX_DIMENSION'a küçültür, yüzleri o kopya üzerinde
+ * tespit eder. Kırpma da aynı kopyadan yapılmalı (aksi halde yüz koordinatları orijinal
+ * boyutla uyuşmaz).
+ */
+async function detectFaces(uri: string): Promise<DetectionSource> {
+  const original = await getImageSize(uri);
+  const longestSide = Math.max(original.width, original.height);
+
+  let detectionUri = uri;
+  let width = original.width;
+  let height = original.height;
+
+  if (longestSide > DETECTION_MAX_DIMENSION) {
+    const scale = DETECTION_MAX_DIMENSION / longestSide;
+    width = Math.round(original.width * scale);
+    height = Math.round(original.height * scale);
+
+    const imageRef = await ImageManipulator.manipulate(uri).resize({ width, height }).renderAsync();
+    const resized = await imageRef.saveAsync({ format: SaveFormat.JPEG, compress: 0.9 });
+    detectionUri = resized.uri;
+  }
+
+  const faces = await FaceDetection.detect(detectionUri, {
     performanceMode: 'accurate',
     landmarkMode: 'none',
     contourMode: 'none',
     classificationMode: 'none',
   });
+
+  return { uri: detectionUri, width, height, faces };
 }
 
 function pickLargestFace(faces: Face[]): Face {
@@ -59,8 +97,8 @@ function pickLargestFace(faces: Face[]): Face {
   );
 }
 
-async function cropFaceToModelInputBase64(uri: string, face: Face): Promise<string> {
-  const { width: imageWidth, height: imageHeight } = await getImageSize(uri);
+async function cropFaceToModelInputBase64(source: DetectionSource, face: Face): Promise<string> {
+  const { uri, width: imageWidth, height: imageHeight } = source;
   const { frame } = face;
 
   const marginX = frame.width * FACE_CROP_MARGIN_RATIO;
@@ -140,9 +178,9 @@ function outputBufferToEmbedding(buffer: ArrayBuffer, dataType: Tensor['dataType
   }
 }
 
-async function embedFace(photoUri: string, face: Face): Promise<number[]> {
+async function embedFace(source: DetectionSource, face: Face): Promise<number[]> {
   const model = await getFaceMatchModel();
-  const croppedBase64 = await cropFaceToModelInputBase64(photoUri, face);
+  const croppedBase64 = await cropFaceToModelInputBase64(source, face);
   const rgba = decodeJpegBase64ToRgba(croppedBase64);
 
   const inputBuffer = rgbaToModelInputBuffer(rgba, model.inputs[0].dataType);
@@ -156,11 +194,11 @@ async function embedFace(photoUri: string, face: Face): Promise<number[]> {
  * ve MobileFaceNet embedding vektörünü döndürür. Yüz bulunamazsa hata fırlatır.
  */
 export async function getFaceEmbedding(photoUri: string, label?: string): Promise<number[]> {
-  const faces = await detectFaces(photoUri);
-  if (faces.length === 0) {
+  const source = await detectFaces(photoUri);
+  if (source.faces.length === 0) {
     throw new NoFaceDetectedError(label);
   }
-  return embedFace(photoUri, pickLargestFace(faces));
+  return embedFace(source, pickLargestFace(source.faces));
 }
 
 /**
@@ -168,10 +206,10 @@ export async function getFaceEmbedding(photoUri: string, label?: string): Promis
  * Yüz yoksa hata fırlatmaz, boş dizi döner.
  */
 export async function getAllFaceEmbeddings(photoUri: string): Promise<number[][]> {
-  const faces = await detectFaces(photoUri);
+  const source = await detectFaces(photoUri);
   const embeddings: number[][] = [];
-  for (const face of faces) {
-    embeddings.push(await embedFace(photoUri, face));
+  for (const face of source.faces) {
+    embeddings.push(await embedFace(source, face));
   }
   return embeddings;
 }
