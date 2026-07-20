@@ -24,10 +24,6 @@ import {
 } from './faceMatch';
 import { clearScanCache, getCachedScan, setCachedScan } from './photoCache';
 
-// PoC kapsamında taramayı makul bir sürede tutmak için üst sınır.
-// Gerçek uygulamada (Adım 8) bu sınır kaldırılıp sayfalı/arka planda tarama yapılacak.
-const MAX_SCAN_ASSETS = 300;
-
 interface MatchItem {
   assetId: string;
   uri: string;
@@ -102,7 +98,6 @@ export default function GallerySearchScreen() {
       metadata = await new MediaLibrary.Query()
         .eq(MediaLibrary.AssetField.MEDIA_TYPE, MediaLibrary.MediaType.IMAGE)
         .orderBy({ key: MediaLibrary.AssetField.CREATION_TIME, ascending: false })
-        .limit(MAX_SCAN_ASSETS)
         .exeForMetadata();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Galeri okunamadı.');

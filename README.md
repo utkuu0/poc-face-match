@@ -69,8 +69,9 @@ Telefonundaki dev client uygulaması QR kodu okutup Metro'ya bağlanacak.
 ### Galeride Ara (ana özellik)
 
 1. "Referans fotoğraf" olarak bir kişinin net bir fotoğrafını seç.
-2. "Galeriyi Tara" butonuna bas — galerideki fotoğraflar (en yeni 300 tanesi,
-   bkz. `MAX_SCAN_ASSETS`) sırayla taranır, ilerleme "X / Y" olarak görünür.
+2. "Galeriyi Tara" butonuna bas — galerideki TÜM fotoğraflar (en yeniden en
+   eskiye) sırayla taranır, ilerleme "X / Y" olarak görünür. Çok fotoğraflı
+   galerilerde tarama uzun sürebilir; istediğin an "İptal" ile durdurabilirsin.
 3. Eşleşen fotoğraflar anlık olarak grid'de birikir, benzerlik yüzdesiyle.
    Bir fotoğrafa dokununca tam ekran önizleme açılır.
 4. Taramayı istediğin an "İptal" ile durdurabilirsin.
@@ -104,10 +105,10 @@ bilgi, indirdiğin `.tflite` dosyası varsayılanlardan farklıysa
 - **Paket kurulum hataları (versiyon uyuşmazlığı)** → kütüphane
   versiyonları hızlı değişiyor; "bu paketi Expo SDK 57 ile uyumlu en güncel
   sürüme güncelle" diyerek devam edebilirsin.
-- **Galeri taraması çok yavaş / donuyor gibi** → `src/GallerySearchScreen.tsx`
-  içindeki `MAX_SCAN_ASSETS` (varsayılan 300) sabitini düşür. Gerçek
-  uygulamada (Adım 8) bu sınır kaldırılıp arka planda/sayfalı tarama
-  yapılacak; bu PoC'ta bilinçli olarak sınırlı tutuldu.
+- **Galeri taraması çok yavaş / donuyor gibi** → tarama sayısı sınırsız,
+  büyük galerilerde uzun sürebilir. "İptal" ile durdurabilir, tekrar
+  başlattığında (aynı fotoğraflar önbellekten okunacağı için) kaldığın
+  yerden devam edebilirsin.
 - **Galeri izni istemiyor / taramada hiç sonuç yok** → cihazda çok az fotoğraf
   varsa ya da izin "sınırlı" (limited) verildiyse sadece izin verilen
   fotoğraflar taranır. Android'de tüm galeri erişimi için izin diyaloğunda
