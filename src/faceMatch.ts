@@ -44,19 +44,16 @@ function getImageSize(uri: string): Promise<{ width: number; height: number }> {
   });
 }
 
-async function detectLargestFace(uri: string, label?: string): Promise<Face> {
-  const faces = await FaceDetection.detect(uri, {
+async function detectFaces(uri: string): Promise<Face[]> {
+  return FaceDetection.detect(uri, {
     performanceMode: 'accurate',
     landmarkMode: 'none',
     contourMode: 'none',
     classificationMode: 'none',
   });
+}
 
-  if (faces.length === 0) {
-    throw new NoFaceDetectedError(label);
-  }
-
-  // Fotoğrafta birden fazla yüz varsa en büyük (muhtemelen ana özne olan) yüzü kullan.
+function pickLargestFace(faces: Face[]): Face {
   return faces.reduce((largest, face) =>
     face.frame.width * face.frame.height > largest.frame.width * largest.frame.height ? face : largest
   );
@@ -143,13 +140,8 @@ function outputBufferToEmbedding(buffer: ArrayBuffer, dataType: Tensor['dataType
   }
 }
 
-/**
- * Bir fotoğraftaki en belirgin yüzü tespit eder, kırpıp modele uygun boyuta getirir
- * ve MobileFaceNet embedding vektörünü döndürür.
- */
-export async function getFaceEmbedding(photoUri: string, label?: string): Promise<number[]> {
+async function embedFace(photoUri: string, face: Face): Promise<number[]> {
   const model = await getFaceMatchModel();
-  const face = await detectLargestFace(photoUri, label);
   const croppedBase64 = await cropFaceToModelInputBase64(photoUri, face);
   const rgba = decodeJpegBase64ToRgba(croppedBase64);
 
@@ -157,6 +149,31 @@ export async function getFaceEmbedding(photoUri: string, label?: string): Promis
   const [outputBuffer] = await model.run([inputBuffer]);
 
   return outputBufferToEmbedding(outputBuffer, model.outputs[0].dataType);
+}
+
+/**
+ * Bir fotoğraftaki en belirgin yüzü tespit eder, kırpıp modele uygun boyuta getirir
+ * ve MobileFaceNet embedding vektörünü döndürür. Yüz bulunamazsa hata fırlatır.
+ */
+export async function getFaceEmbedding(photoUri: string, label?: string): Promise<number[]> {
+  const faces = await detectFaces(photoUri);
+  if (faces.length === 0) {
+    throw new NoFaceDetectedError(label);
+  }
+  return embedFace(photoUri, pickLargestFace(faces));
+}
+
+/**
+ * Bir fotoğraftaki TÜM yüzlerin embedding'lerini döndürür (galeri taraması için).
+ * Yüz yoksa hata fırlatmaz, boş dizi döner.
+ */
+export async function getAllFaceEmbeddings(photoUri: string): Promise<number[][]> {
+  const faces = await detectFaces(photoUri);
+  const embeddings: number[][] = [];
+  for (const face of faces) {
+    embeddings.push(await embedFace(photoUri, face));
+  }
+  return embeddings;
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {

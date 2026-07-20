@@ -1,13 +1,19 @@
 # Yüz Eşleştirme PoC
 
-Doğum günü takvimi projesinin **Adım 0**'ı: iki fotoğraf seçip aynı kişi olup
-olmadığını cihaz üzerinde (on-device) kontrol eden tek ekranlık bir Expo
-uygulaması.
+Doğum günü takvimi projesinin **Adım 0**'ı: cihaz üzerinde (on-device) yüz
+eşleştirme yapan bir Expo uygulaması. İki ekran var:
+
+- **Galeride Ara** (asıl amaç): bir referans fotoğraf seç, cihaz galerisini
+  tara, aynı kişinin geçtiği fotoğrafları bul.
+- **İki Fotoğraf Karşılaştır**: temel ML pipeline'ını (tespit → embedding →
+  benzerlik) hızlıca doğrulamak için minimal bir test ekranı.
 
 Pipeline: **ML Kit** (yüz tespiti) → **expo-image-manipulator** (yüzü kırpıp
 112x112'ye küçültme) → **jpeg-js** (piksel verisine çözme) →
 **react-native-fast-tflite + MobileFaceNet** (embedding çıkarma) →
-**cosine similarity** (karşılaştırma).
+**cosine similarity** (karşılaştırma). Galeri taraması **expo-media-library**
+ile fotoğrafları okur, sonuçları **expo-sqlite** ile önbelleğe alır (aynı
+fotoğraf iki kere işlenmez — artımlı tarama).
 
 > Bu uygulama native modül (ML Kit, TFLite) içerdiği için **Expo Go'da
 > çalışmaz**. Bir Expo Dev Client build'i gerekiyor.
@@ -60,11 +66,25 @@ Telefonundaki dev client uygulaması QR kodu okutup Metro'ya bağlanacak.
 
 ## 5. Kullanım
 
+### Galeride Ara (ana özellik)
+
+1. "Referans fotoğraf" olarak bir kişinin net bir fotoğrafını seç.
+2. "Galeriyi Tara" butonuna bas — galerideki fotoğraflar (en yeni 300 tanesi,
+   bkz. `MAX_SCAN_ASSETS`) sırayla taranır, ilerleme "X / Y" olarak görünür.
+3. Eşleşen fotoğraflar anlık olarak grid'de birikir, benzerlik yüzdesiyle.
+   Bir fotoğrafa dokununca tam ekran önizleme açılır.
+4. Taramayı istediğin an "İptal" ile durdurabilirsin.
+5. Aynı taramayı tekrar çalıştırırsan daha önce işlenen fotoğraflar
+   önbellekten (SQLite) okunur, yeniden işlenmez — sadece yeni eklenen
+   fotoğraflar taranır. "Tarama önbelleğini temizle" ile sıfırlayabilirsin.
+
+### İki Fotoğraf Karşılaştır (pipeline testi)
+
 1. İki fotoğraf seç (galeriden).
 2. "Karşılaştır" butonuna bas.
-3. Benzerlik yüzdesini ve eşleşme sonucunu gör. Eşik değerini (varsayılan
-   `0.7`) ekrandan değiştirebilirsin.
+3. Benzerlik yüzdesini ve eşleşme sonucunu gör.
 
+Her iki ekranda da eşik değeri (varsayılan `0.7`) elle değiştirilebilir.
 Ekranın altında modelin girdi/çıktı boyut ve veri tipi bilgisi görünür — bu
 bilgi, indirdiğin `.tflite` dosyası varsayılanlardan farklıysa
 `src/faceMatch.ts` içinde neyi güncellemen gerektiğini anlamana yardımcı olur
@@ -84,6 +104,14 @@ bilgi, indirdiğin `.tflite` dosyası varsayılanlardan farklıysa
 - **Paket kurulum hataları (versiyon uyuşmazlığı)** → kütüphane
   versiyonları hızlı değişiyor; "bu paketi Expo SDK 57 ile uyumlu en güncel
   sürüme güncelle" diyerek devam edebilirsin.
+- **Galeri taraması çok yavaş / donuyor gibi** → `src/GallerySearchScreen.tsx`
+  içindeki `MAX_SCAN_ASSETS` (varsayılan 300) sabitini düşür. Gerçek
+  uygulamada (Adım 8) bu sınır kaldırılıp arka planda/sayfalı tarama
+  yapılacak; bu PoC'ta bilinçli olarak sınırlı tutuldu.
+- **Galeri izni istemiyor / taramada hiç sonuç yok** → cihazda çok az fotoğraf
+  varsa ya da izin "sınırlı" (limited) verildiyse sadece izin verilen
+  fotoğraflar taranır. Android'de tüm galeri erişimi için izin diyaloğunda
+  "Tümüne izin ver"i seçtiğinden emin ol.
 
 ## PoC çalıştıktan sonra
 

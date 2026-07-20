@@ -45,7 +45,14 @@
           ],
           "enableCoreMLDelegate": true
         }
-      ]
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Galerideki fotoğrafları tarayıp yüz eşleştirebilmek için erişim gerekiyor."
+        }
+      ],
+      "expo-sqlite"
     ],
     "extra": {
       "eas": {
